@@ -219,6 +219,13 @@ class FileDropZone extends GestureEventListeners(PolymerElement) {
         type: Function,
         value: null,
         observer: '_onchangeChanged'
+      },
+      /**
+       * Maximum file size (in bytes)
+       * @type {Number}
+       */
+      maxSize: {
+        type: Number,
       }
     };
   }
@@ -255,20 +262,27 @@ class FileDropZone extends GestureEventListeners(PolymerElement) {
     var hasImage = acceptList.indexOf('image/*') >= 0;
 
     for (let i = 0, len = fileList.length; i < len; ++i) {
+      const file = fileList[i];
       let ext =
         '.' +
         fileList[i].name
           .split('.')
           .pop()
           .toLowerCase();
+      if (this.maxSize && file.size > this.maxSize) {
+        this._setLastError(new ErrorEvent('error', {
+          message: 'El archivo subido es demasiado grande',
+        }));
+        return false;
+      }
       if (acceptList.indexOf(ext) >= 0) continue;
-      if (hasAudio && fileList[i].type.split('/')[0] === 'audio') continue;
-      if (hasVideo && fileList[i].type.split('/')[0] === 'video') continue;
-      if (hasImage && fileList[i].type.split('/')[0] === 'image') continue;
-      if (acceptList.indexOf(fileList[i].type) >= 0) continue;
+      if (hasAudio && file.type.split('/')[0] === 'audio') continue;
+      if (hasVideo && file.type.split('/')[0] === 'video') continue;
+      if (hasImage && file.type.split('/')[0] === 'image') continue;
+      if (acceptList.indexOf(file.type) >= 0) continue;
 
       // did not match anything in accept
-      let message = `${fileList[i].name} El formato del archivo es incorrecto`;
+      let message = `${file.name} El formato del archivo es incorrecto`;
       this._setLastError(new ErrorEvent('error', {message}));
       return false;
     }
@@ -298,11 +312,17 @@ class FileDropZone extends GestureEventListeners(PolymerElement) {
   _onFilePick(e) {
     e.stopPropagation();
     e.preventDefault();
-    this._setLastError(null);
-    this._setFiles(this._toArray(e.target.files));
-    this.dispatchEvent(new CustomEvent('selected', {detail: e.target.files}));
-    this.dispatchEvent(new CustomEvent('change', {detail: e.target.files}));
-    this.$.files.value = null;
+    const files = this._toArray(e.target.files);
+    if (files.length === 0) return;
+
+    const ok = this._validate(files);
+    if (ok) {
+      this._setLastError(null);
+      this._setFiles(files);
+      this.dispatchEvent(new CustomEvent('selected', {detail: e.target.files}));
+      this.dispatchEvent(new CustomEvent('change', {detail: e.target.files}));
+      this.$.files.value = null;
+    }
   }
 
   _onFileDrop(e) {
